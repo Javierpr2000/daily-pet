@@ -1,0 +1,66 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+  body { margin: 0; font: 14px system-ui, sans-serif; background: #1e1f24; color: #eee; }
+  header { padding: 10px 12px; display: flex; justify-content: space-between; -webkit-app-region: drag; background: #2a2c33; }
+  header button { -webkit-app-region: no-drag; }
+  h3 { margin: 12px 12px 4px; font-size: 12px; text-transform: uppercase; color: #999; }
+  ul { list-style: none; margin: 0; padding: 0 12px; }
+  li { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid #333; }
+  li.done span { text-decoration: line-through; color: #777; }
+  li span { flex: 1; }
+  button { background: #3a3d46; color: #eee; border: 0; border-radius: 4px; padding: 4px 8px; cursor: pointer; }
+  form { display: flex; gap: 6px; padding: 12px; flex-wrap: wrap; }
+  input, select { background: #2a2c33; color: #eee; border: 1px solid #444; border-radius: 4px; padding: 4px; }
+  input[name=title] { flex: 1; min-width: 140px; }
+  input[name=required] { width: 48px; }
+</style></head>
+<body>
+<header><b>Hoy</b><button onclick="window.close()">✕</button></header>
+<form id="add">
+  <input name="title" placeholder="Nueva tarea" required>
+  <select name="kind"><option value="daily">Diaria</option><option value="today">Solo hoy</option></select>
+  <input name="required" type="number" min="1" value="1" title="Repeticiones">
+  <button>+</button>
+</form>
+<h3>Diarias</h3><ul id="daily"></ul>
+<h3>Solo hoy</h3><ul id="today"></ul>
+<script>
+  let data;
+  const today = () => new Date().toLocaleDateString('en-CA');
+
+  async function refresh() { data = await api.getTasks(); render(); }
+  async function persist() { await api.saveTasks(data); render(); }
+
+  function render() {
+    for (const kind of ['daily', 'today']) {
+      document.getElementById(kind).replaceChildren(...data.tasks.filter(t => t.kind === kind).map(t => {
+        const li = document.createElement('li');
+        li.className = t.done >= t.required ? 'done' : '';
+        const name = document.createElement('span');
+        name.textContent = t.title;
+        const tick = document.createElement('button');
+        tick.textContent = `${t.done}/${t.required}`;
+        tick.onclick = () => { t.done = t.done >= t.required ? 0 : t.done + 1; persist(); };
+        const del = document.createElement('button');
+        del.textContent = '🗑';
+        del.onclick = () => { data.tasks = data.tasks.filter(x => x !== t); persist(); };
+        li.append(name, tick, del);
+        return li;
+      }));
+    }
+  }
+
+  document.getElementById('add').onsubmit = e => {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    data.tasks.push({ id: crypto.randomUUID(), title: f.get('title').trim(), kind: f.get('kind'),
+      required: Math.max(1, +f.get('required') || 1), done: 0, date: today() });
+    e.target.reset();
+    persist();
+  };
+
+  api.onChanged(refresh);
+  refresh();
+</script>
+</body></html>

@@ -1,0 +1,32 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+  html, body { margin: 0; background: transparent; overflow: hidden; user-select: none; }
+  #pet { position: relative; width: 72px; height: 60px; margin: 24px auto 0; cursor: pointer; }
+  .body { position: absolute; inset: 0 0 12px; background: #7bc96f; border-radius: 50% 50% 40% 40%;
+    animation: bob .4s ease-in-out infinite alternate; }
+  .eye { position: absolute; top: 16px; width: 8px; height: 10px; background: #222; border-radius: 50%; }
+  .eye.l { left: 38px; } .eye.r { left: 52px; }
+  .leg { position: absolute; bottom: 0; width: 12px; height: 14px; background: #4f9a45; border-radius: 4px;
+    animation: step .4s ease-in-out infinite alternate; }
+  .leg.a { left: 16px; } .leg.b { left: 44px; animation-direction: alternate-reverse; }
+  #pet.left { transform: scaleX(-1); }
+  #pet.idle .leg, #pet.idle .body { animation-play-state: paused; }
+  @keyframes bob { to { transform: translateY(-3px); } }
+  @keyframes step { from { transform: rotate(-20deg); } to { transform: rotate(20deg); } }
+</style></head>
+<body>
+<div id="pet"><div class="leg a"></div><div class="leg b"></div>
+  <div class="body"><div class="eye l"></div><div class="eye r"></div></div></div>
+<script>
+  const pet = document.getElementById('pet');
+  pet.onclick = () => api.togglePanel();
+  pet.oncontextmenu = e => { e.preventDefault(); api.menu(); };
+  pet.onmouseenter = () => { api.hover(true); pet.classList.add('idle'); };
+  pet.onmouseleave = () => { api.hover(false); pet.classList.remove('idle'); };
+  api.onDir(d => {
+    pet.classList.toggle('idle', d === 0);
+    if (d) pet.classList.toggle('left', d < 0);
+  });
+</script>
+</body></html>
