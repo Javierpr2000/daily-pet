@@ -29,11 +29,19 @@ function load() {
 }
 
 const timeOrNull = v => /^\d{2}:\d{2}$/.test(v) ? v : null;
-const minutesOrNull = v => { const n = Math.floor(+v); return n >= 1 ? Math.min(n, 1440) : null; };
+const UNIT_MS = { s: 1000, m: 60_000, h: 3_600_000 };
+// ponytail: 10s floor so a typo can't flood the Windows notification center
+function interval(every, unit) {
+  unit = Object.hasOwn(UNIT_MS, unit) ? unit : 'm';
+  const n = Math.floor(+every);
+  if (!(n >= 1)) return { every: null, unit };
+  return { every: Math.min(Math.max(n, Math.ceil(10_000 / UNIT_MS[unit])), 86_400_000 / UNIT_MS[unit]), unit };
+}
+const kindOf = k => k === 'today' ? 'today' : 'daily';
 
 const ops = {
-  add: (data, t) => String(t.title).trim() && data.tasks.push({ id: crypto.randomUUID(), title: String(t.title).trim(), kind: t.kind === 'today' ? 'today' : 'daily',
-    required: Math.max(1, Math.floor(+t.required) || 1), done: 0, date: today(), at: timeOrNull(t.at), every: minutesOrNull(t.every) }),
+  add: (data, t) => String(t.title).trim() && data.tasks.push({ id: crypto.randomUUID(), title: String(t.title).trim(), kind: kindOf(t.kind),
+    required: Math.max(1, Math.floor(+t.required) || 1), done: 0, date: today(), at: timeOrNull(t.at), ...interval(t.every, t.unit) }),
   tick: (data, id) => { const t = data.tasks.find(x => x.id === id); if (t) t.done = Math.min(t.required, t.done + 1); },
   untick: (data, id) => { const t = data.tasks.find(x => x.id === id); if (t) t.done = Math.max(0, t.done - 1); },
   remove: (data, id) => { data.tasks = data.tasks.filter(x => x.id !== id); },
@@ -41,10 +49,11 @@ const ops = {
     const t = data.tasks.find(x => x.id === a.id), title = String(a.title).trim();
     if (!t || !title) return;
     t.title = title;
+    t.kind = kindOf(a.kind ?? t.kind);
     t.required = Math.max(1, Math.floor(+a.required) || 1);
     t.done = Math.min(t.done, t.required);
     t.at = timeOrNull(a.at);
-    t.every = minutesOrNull(a.every);
+    Object.assign(t, interval(a.every, a.unit));
   },
   move: (data, a) => {
     const i = data.tasks.findIndex(x => x.id === a.id);
@@ -61,6 +70,7 @@ function apply(op, arg) {
   save(data);
   sendProgress(data);
   notifyTasks();
+  if (panel && !panel.isDestroyed()) panel.webContents.send('tasks:changed');
   return data;
 }
 
@@ -77,7 +87,8 @@ function dueAt(t) {
   const base = t.at ? todayAt(t.at) : null, last = notified[t.id];
   if (base && Date.now() < base) return base;
   if (!t.every) return last >= base ? null : base;
-  return last ? last + t.every * 60_000 : base ?? started + t.every * 60_000;
+  const ms = t.every * UNIT_MS[t.unit ?? 'm'];
+  return last ? last + ms : base ?? started + ms;
 }
 
 function notifyTasks() {
@@ -227,6 +238,12 @@ ipcMain.handle('reminder:set', (_, t) => {
   saveSettings();
 });
 ipcMain.on('panel:toggle', togglePanel);
+let editor;
+ipcMain.on('editor:open', (_, id) => {
+  if (editor && !editor.isDestroyed()) editor.destroy();
+  editor = new BrowserWindow({ ...common, width: 340, height: 380 });
+  editor.loadFile('editor.html', { query: { id: String(id) } });
+});
 ipcMain.on('pet:hover', (_, h) => { paused = h; });
 ipcMain.on('pet:moveBy', (_, dx, dy) => {
   const [x, y] = pet.getPosition();

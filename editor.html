@@ -1,0 +1,55 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+  body { margin: 0; font: 14px system-ui, sans-serif; background: #1e1f24; color: #eee; }
+  header { padding: 10px 12px; display: flex; justify-content: space-between; -webkit-app-region: drag; background: #2a2c33; }
+  header button { -webkit-app-region: no-drag; }
+  form { display: grid; grid-template-columns: auto 1fr; gap: 10px 8px; padding: 14px 12px; align-items: center; }
+  .row { display: flex; gap: 6px; }
+  .actions { grid-column: 1 / -1; display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
+  button { background: #3a3d46; color: #eee; border: 0; border-radius: 4px; padding: 6px 12px; cursor: pointer; }
+  button.primary { background: #3b82f6; }
+  input, select { background: #2a2c33; color: #eee; border: 1px solid #444; border-radius: 4px; padding: 4px; min-width: 0; }
+  small { grid-column: 1 / -1; color: #999; }
+</style></head>
+<body>
+<header><b>Editar tarea</b><button onclick="window.close()">✕</button></header>
+<form id="f">
+  <label for="title">Título</label><input id="title" name="title" required>
+  <label for="kind">Tipo</label>
+  <select id="kind" name="kind"><option value="daily">Diaria</option><option value="today">Solo hoy</option></select>
+  <label for="required">Repeticiones</label><input id="required" name="required" type="number" min="1">
+  <label for="at">Avisar a las</label><input id="at" name="at" type="time">
+  <label for="every">Repetir aviso cada</label>
+  <div class="row">
+    <input id="every" name="every" type="number" min="1" placeholder="—" style="width: 70px">
+    <select name="unit"><option value="s">segundos</option><option value="m">minutos</option><option value="h">horas</option></select>
+  </div>
+  <small>Vacío = sin aviso. Mínimo 10 segundos, máximo 24 horas.</small>
+  <div class="actions"><button type="button" onclick="window.close()">Cancelar</button><button class="primary">Guardar</button></div>
+</form>
+<script>
+  const id = new URLSearchParams(location.search).get('id');
+  const f = document.getElementById('f');
+
+  api.getTasks().then(({ tasks }) => {
+    const t = tasks.find(x => x.id === id);
+    if (!t) return window.close();
+    f.elements.title.value = t.title;
+    f.elements.kind.value = t.kind;
+    f.elements.required.value = t.required;
+    f.elements.at.value = t.at ?? '';
+    f.elements.every.value = t.every ?? '';
+    f.elements.unit.value = t.unit ?? 'm';
+    f.elements.title.focus();
+  });
+
+  f.onsubmit = async e => {
+    e.preventDefault();
+    const v = Object.fromEntries(new FormData(f));
+    await api.op('edit', { id, ...v });
+    window.close();
+  };
+  document.onkeydown = e => { if (e.key === 'Escape') window.close(); };
+</script>
+</body></html>

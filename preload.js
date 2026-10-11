@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('api', {
   getReminder: () => ipcRenderer.invoke('reminder:get'),
   setReminder: t => ipcRenderer.invoke('reminder:set', t),
   togglePanel: () => ipcRenderer.send('panel:toggle'),
+  openEditor: id => ipcRenderer.send('editor:open', id),
   hover: h => ipcRenderer.send('pet:hover', h),
   moveBy: (dx, dy) => ipcRenderer.send('pet:moveBy', dx, dy),
   dragEnd: () => ipcRenderer.send('pet:dragEnd'),

@@ -13,8 +13,8 @@
   form { display: flex; gap: 6px; padding: 12px; flex-wrap: wrap; }
   input, select { background: #2a2c33; color: #eee; border: 1px solid #444; border-radius: 4px; padding: 4px; }
   input[name=title] { flex: 1; min-width: 0; }
-  input[name=required], input[name=every] { width: 48px; }
-  small { color: #999; }
+  input[name=required] { width: 48px; }
+  small { display: block; color: #999; font-size: 12px; }
   button:disabled { opacity: .4; cursor: default; }
 </style></head>
 <body>
@@ -24,10 +24,6 @@
   <select name="kind"><option value="daily">Diaria</option><option value="today">Solo hoy</option></select>
   <input name="required" type="number" min="1" value="1" title="Repeticiones">
   <button>Agregar</button>
-  <div style="flex-basis: 100%; display: flex; gap: 6px; align-items: center">
-    <label>Avisar a las <input name="at" type="time"></label>
-    <label>cada <input name="every" type="number" min="1" placeholder="—"> min</label>
-  </div>
 </form>
 <label style="padding: 0 12px">Recordatorio <input id="reminder" type="time"></label>
 <h3>Diarias</h3><ul id="daily"></ul>
@@ -45,23 +41,15 @@
         li.className = t.done >= t.required ? 'done' : '';
         const name = document.createElement('span');
         name.textContent = t.title;
-        const hint = [t.at && `⏰ ${t.at}`, t.every && `cada ${t.every} min`].filter(Boolean).join(' · ');
+        const unit = { s: 's', m: 'min', h: 'h' }[t.unit ?? 'm'];
+        const hint = [t.at && `⏰ ${t.at}`, t.every && `cada ${t.every} ${unit}`].filter(Boolean).join(' · ');
         if (hint) name.append(' ', Object.assign(document.createElement('small'), { textContent: hint }));
         name.title = 'Doble clic para editar';
-        name.ondblclick = () => {
-          const title = Object.assign(document.createElement('input'), { value: t.title });
-          const req = Object.assign(document.createElement('input'), { type: 'number', min: 1, value: t.required, title: 'Repeticiones', style: 'width:48px' });
-          const at = Object.assign(document.createElement('input'), { type: 'time', value: t.at ?? '', title: 'Avisar a las' });
-          const every = Object.assign(document.createElement('input'), { type: 'number', min: 1, value: t.every ?? '', title: 'Cada (min)', placeholder: 'min', style: 'width:48px' });
-          const key = e => {
-            if (e.key === 'Enter') run('edit', { id: t.id, title: title.value, required: req.value, at: at.value, every: every.value });
-            if (e.key === 'Escape') render();
-          };
-          title.onkeydown = req.onkeydown = at.onkeydown = every.onkeydown = key;
-          li.style.flexWrap = 'wrap';
-          li.replaceChildren(title, req, at, every);
-          title.focus();
-        };
+        name.ondblclick = () => api.openEditor(t.id);
+        const edit = document.createElement('button');
+        edit.textContent = '✎';
+        edit.title = 'Editar';
+        edit.onclick = () => api.openEditor(t.id);
         const up = document.createElement('button');
         up.textContent = '▲';
         up.title = 'Subir';
@@ -81,7 +69,7 @@
         const del = document.createElement('button');
         del.textContent = '🗑';
         del.onclick = () => run('remove', t.id);
-        li.append(name, minus, tick, up, down, del);
+        li.append(name, minus, tick, up, down, edit, del);
         return li;
       }));
     }
@@ -90,7 +78,7 @@
   document.getElementById('add').onsubmit = e => {
     e.preventDefault();
     const f = new FormData(e.target);
-    run('add', { title: f.get('title'), kind: f.get('kind'), required: f.get('required'), at: f.get('at'), every: f.get('every') });
+    run('add', { title: f.get('title'), kind: f.get('kind'), required: f.get('required') });
     e.target.reset();
   };
 
