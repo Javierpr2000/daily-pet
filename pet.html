@@ -8,11 +8,18 @@
     animation: walk .8s steps(8) infinite; }
   #pet.idle { background-position-y: 0; animation: idle .8s steps(5) infinite; }
   #pet.left { transform: scaleX(-1); }
+  #progress { position: absolute; top: 0; left: 0; right: 0; text-align: center; pointer-events: none;
+    font: bold 13px monospace; color: #fff; text-shadow: -1px -1px #000, 1px -1px #000, -1px 1px #000, 1px 1px #000; }
+  #progress:empty { display: none; }
+  body.happy #progress { color: #5f5; }
+  body.happy { animation: hop .4s 3; }
+  @keyframes hop { 50% { translate: 0 -6px; } }
   @keyframes walk { from { background-position-x: 0; } to { background-position-x: -768px; } }
   @keyframes idle { from { background-position-x: 0; } to { background-position-x: -480px; } }
 </style></head>
 <body>
 <div id="pet"></div>
+<div id="progress"></div>
 <script>
   const pet = document.getElementById('pet');
   let last, dragged = false;
@@ -30,6 +37,11 @@
   pet.oncontextmenu = e => { e.preventDefault(); api.menu(); };
   pet.onmouseenter = () => { api.hover(true); pet.classList.add('idle'); };
   pet.onmouseleave = () => { api.hover(false); pet.classList.remove('idle'); };
+  api.onProgress((done, total) => {
+    const happy = total > 0 && done === total;
+    document.getElementById('progress').textContent = total ? (happy ? '✓ ' : '') + `${done}/${total}` : '';
+    document.body.classList.toggle('happy', happy);
+  });
   api.onDir(d => {
     pet.classList.toggle('idle', d === 0);
     if (d) pet.classList.toggle('left', d < 0);
