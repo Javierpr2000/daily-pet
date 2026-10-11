@@ -2,22 +2,17 @@
 <html><head><meta charset="utf-8">
 <style>
   html, body { margin: 0; background: transparent; overflow: hidden; user-select: none; }
-  #pet { position: relative; width: 72px; height: 60px; margin: 24px auto 0; cursor: pointer; }
-  .body { position: absolute; inset: 0 0 12px; background: #7bc96f; border-radius: 50% 50% 40% 40%;
-    animation: bob .4s ease-in-out infinite alternate; }
-  .eye { position: absolute; top: 16px; width: 8px; height: 10px; background: #222; border-radius: 50%; }
-  .eye.l { left: 38px; } .eye.r { left: 52px; }
-  .leg { position: absolute; bottom: 0; width: 12px; height: 14px; background: #4f9a45; border-radius: 4px;
-    animation: step .4s ease-in-out infinite alternate; }
-  .leg.a { left: 16px; } .leg.b { left: 44px; animation-direction: alternate-reverse; }
+  /* assets/pet.png: 32px frames, x3. Row 0 = idle (5), row 1 = walk (8). */
+  #pet { width: 96px; height: 96px; cursor: pointer; image-rendering: pixelated;
+    background: url(assets/pet.png) 0 -96px / 768px 288px;
+    animation: walk .8s steps(8) infinite; }
+  #pet.idle { background-position-y: 0; animation: idle .8s steps(5) infinite; }
   #pet.left { transform: scaleX(-1); }
-  #pet.idle .leg, #pet.idle .body { animation-play-state: paused; }
-  @keyframes bob { to { transform: translateY(-3px); } }
-  @keyframes step { from { transform: rotate(-20deg); } to { transform: rotate(20deg); } }
+  @keyframes walk { from { background-position-x: 0; } to { background-position-x: -768px; } }
+  @keyframes idle { from { background-position-x: 0; } to { background-position-x: -480px; } }
 </style></head>
 <body>
-<div id="pet"><div class="leg a"></div><div class="leg b"></div>
-  <div class="body"><div class="eye l"></div><div class="eye r"></div></div></div>
+<div id="pet"></div>
 <script>
   const pet = document.getElementById('pet');
   let last, dragged = false;
