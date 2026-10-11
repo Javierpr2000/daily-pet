@@ -20,7 +20,18 @@
   <div class="body"><div class="eye l"></div><div class="eye r"></div></div></div>
 <script>
   const pet = document.getElementById('pet');
-  pet.onclick = () => api.togglePanel();
+  let last, dragged = false;
+  pet.onpointerdown = e => { if (e.button !== 0) return; last = [e.screenX, e.screenY]; dragged = false; pet.setPointerCapture(e.pointerId); };
+  pet.onpointermove = e => {
+    if (!last) return;
+    const dx = Math.round(e.screenX - last[0]), dy = Math.round(e.screenY - last[1]);
+    if (!dragged && Math.abs(dx) + Math.abs(dy) < 4) return;
+    dragged = true;
+    last = [last[0] + dx, last[1] + dy];
+    api.moveBy(dx, dy);
+  };
+  pet.onpointerup = () => { last = null; };
+  pet.onclick = () => { if (!dragged) api.togglePanel(); };
   pet.oncontextmenu = e => { e.preventDefault(); api.menu(); };
   pet.onmouseenter = () => { api.hover(true); pet.classList.add('idle'); };
   pet.onmouseleave = () => { api.hover(false); pet.classList.remove('idle'); };
