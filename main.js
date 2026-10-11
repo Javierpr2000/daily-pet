@@ -196,6 +196,9 @@ ipcMain.on('pet:menu', () => Menu.buildFromTemplate([
 
 app.on('before-quit', saveSettings);
 
+// Windows drops toasts from apps without an AppUserModelId; unpackaged runs must use the exe path.
+app.setAppUserModelId(app.isPackaged ? 'com.dailypet.app' : process.execPath);
+
 app.whenReady().then(() => {
   loadSettings();
   armReminder();
