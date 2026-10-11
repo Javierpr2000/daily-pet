@@ -11,5 +11,6 @@ contextBridge.exposeInMainWorld('api', {
   dragEnd: () => ipcRenderer.send('pet:dragEnd'),
   menu: () => ipcRenderer.send('pet:menu'),
   onDir: cb => ipcRenderer.on('pet:dir', (_, d) => cb(d)),
+  onProgress: cb => ipcRenderer.on('pet:progress', (_, done, total) => cb(done, total)),
   onChanged: cb => ipcRenderer.on('tasks:changed', cb),
 });

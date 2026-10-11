@@ -39,7 +39,12 @@ function apply(op, arg) {
   const data = load();
   ops[op](data, arg);
   save(data);
+  sendProgress(data);
   return data;
+}
+
+function sendProgress({ tasks }) {
+  if (pet && !pet.isDestroyed()) pet.webContents.send('pet:progress', tasks.filter(x => x.done >= x.required).length, tasks.length);
 }
 
 function resetIfNewDay(data) {
@@ -50,6 +55,7 @@ function resetIfNewDay(data) {
     .map(x => x.kind === 'daily' ? { ...x, done: 0 } : x);
   data.lastReset = t;
   save(data);
+  sendProgress(data);
   return data;
 }
 
@@ -93,7 +99,7 @@ function createWindows() {
   const [x, y] = fits ? pos : [area.x + 100, area.y + area.height - size()];
   pet = new BrowserWindow({ ...common, transparent: true, skipTaskbar: true, width: size(), height: size(), x, y });
   pet.loadFile('pet.html');
-  pet.webContents.on('did-finish-load', () => pet.webContents.setZoomFactor(scale));
+  pet.webContents.on('did-finish-load', () => { pet.webContents.setZoomFactor(scale); sendProgress(load()); });
 
   createPanel();
 
