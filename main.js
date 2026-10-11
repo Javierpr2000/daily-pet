@@ -242,7 +242,7 @@ let editor;
 ipcMain.on('editor:open', (_, id) => {
   if (editor && !editor.isDestroyed()) editor.destroy();
   editor = new BrowserWindow({ ...common, width: 340, height: 380 });
-  editor.loadFile('editor.html', { query: { id: String(id) } });
+  editor.loadFile('editor.html', id ? { query: { id: String(id) } } : {});
 });
 ipcMain.on('pet:hover', (_, h) => { paused = h; });
 ipcMain.on('pet:moveBy', (_, dx, dy) => {

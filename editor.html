@@ -13,7 +13,7 @@
   small { grid-column: 1 / -1; color: #999; }
 </style></head>
 <body>
-<header><b>Editar tarea</b><button onclick="window.close()">✕</button></header>
+<header><b id="heading">Editar tarea</b><button onclick="window.close()">✕</button></header>
 <form id="f">
   <label for="title">Título</label><input id="title" name="title" required>
   <label for="kind">Tipo</label>
@@ -32,7 +32,13 @@
   const id = new URLSearchParams(location.search).get('id');
   const f = document.getElementById('f');
 
-  api.getTasks().then(({ tasks }) => {
+  if (!id) {
+    document.getElementById('heading').textContent = document.title = 'Nueva tarea';
+    f.querySelector('button.primary').textContent = 'Agregar';
+    f.elements.required.value = 1;
+    f.elements.unit.value = 'm';
+    f.elements.title.focus();
+  } else api.getTasks().then(({ tasks }) => {
     const t = tasks.find(x => x.id === id);
     if (!t) return window.close();
     f.elements.title.value = t.title;
@@ -47,7 +53,7 @@
   f.onsubmit = async e => {
     e.preventDefault();
     const v = Object.fromEntries(new FormData(f));
-    await api.op('edit', { id, ...v });
+    await (id ? api.op('edit', { id, ...v }) : api.op('add', v));
     window.close();
   };
   document.onkeydown = e => { if (e.key === 'Escape') window.close(); };
