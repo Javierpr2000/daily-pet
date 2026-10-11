@@ -6,11 +6,40 @@ const PET = 96;
 const file = () => path.join(app.getPath('userData'), 'tasks.json');
 const today = () => new Date().toLocaleDateString('en-CA');
 
+function readJson(f, fallback) {
+  let text;
+  try { text = fs.readFileSync(f, 'utf8'); }
+  catch (e) { if (e.code === 'ENOENT') return fallback; throw e; }
+  try { return JSON.parse(text); }
+  catch {
+    const aside = `${f}.corrupt-${Date.now()}`;
+    fs.renameSync(f, aside);
+    console.error(`Corrupt ${f}, moved to ${aside}`);
+    return fallback;
+  }
+}
+
+function writeJson(f, data) {
+  fs.writeFileSync(`${f}.tmp`, JSON.stringify(data, null, 2));
+  fs.renameSync(`${f}.tmp`, f);
+}
+
 function load() {
-  let data;
-  try { data = JSON.parse(fs.readFileSync(file(), 'utf8')); }
-  catch (e) { if (e.code !== 'ENOENT') throw e; data = { lastReset: today(), tasks: [] }; }
-  return resetIfNewDay(data);
+  return resetIfNewDay(readJson(file(), { lastReset: today(), tasks: [] }));
+}
+
+const ops = {
+  add: (data, t) => data.tasks.push({ id: crypto.randomUUID(), title: String(t.title).trim(), kind: t.kind === 'today' ? 'today' : 'daily',
+    required: Math.max(1, Math.floor(+t.required) || 1), done: 0, date: today() }),
+  tick: (data, id) => { const t = data.tasks.find(x => x.id === id); if (t) t.done = t.done >= t.required ? 0 : t.done + 1; },
+  remove: (data, id) => { data.tasks = data.tasks.filter(x => x.id !== id); },
+};
+
+function apply(op, arg) {
+  const data = load();
+  ops[op](data, arg);
+  save(data);
+  return data;
 }
 
 function resetIfNewDay(data) {
@@ -25,7 +54,7 @@ function resetIfNewDay(data) {
 }
 
 function save(data) {
-  fs.writeFileSync(file(), JSON.stringify(data, null, 2));
+  writeJson(file(), data);
 }
 
 let pet, panel, dir = 1, paused = false, walking = true, scale = 1;
@@ -33,13 +62,16 @@ const size = () => Math.round(PET * scale);
 const settingsFile = () => path.join(app.getPath('userData'), 'settings.json');
 
 function loadSettings() {
-  try { ({ walking = true, scale = 1 } = JSON.parse(fs.readFileSync(settingsFile(), 'utf8'))); }
-  catch (e) { if (e.code !== 'ENOENT') throw e; }
+  ({ walking = true, scale = 1 } = readJson(settingsFile(), {}));
 }
 
 function saveSettings() {
-  fs.writeFileSync(settingsFile(), JSON.stringify({ walking, scale }));
+  writeJson(settingsFile(), { walking, scale });
 }
+
+// Dev runs (npm start) must pass the app folder to electron.exe, or Windows launches an empty Electron.
+const loginArgs = () => app.isPackaged ? [] : [app.getAppPath()];
+const startsWithWindows = () => app.getLoginItemSettings({ args: loginArgs() }).openAtLogin;
 
 function createWindows() {
   const area = screen.getPrimaryDisplay().workArea;
@@ -86,7 +118,10 @@ function resize(s) {
 }
 
 ipcMain.handle('tasks:get', () => load());
-ipcMain.handle('tasks:save', (_, data) => save(data));
+ipcMain.handle('tasks:op', (_, op, arg) => {
+  if (!Object.hasOwn(ops, op)) throw new Error(`Unknown op ${op}`);
+  return apply(op, arg);
+});
 ipcMain.on('panel:toggle', togglePanel);
 ipcMain.on('pet:hover', (_, h) => { paused = h; });
 ipcMain.on('pet:moveBy', (_, dx, dy) => {
@@ -98,6 +133,8 @@ ipcMain.on('pet:menu', () => Menu.buildFromTemplate([
   { label: 'Caminar', type: 'checkbox', checked: walking, click: () => { walking = !walking; saveSettings(); } },
   { label: 'Tamaño', submenu: [['Pequeño', 0.6], ['Mediano', 1], ['Grande', 1.6]].map(([label, s]) =>
     ({ label, type: 'radio', checked: scale === s, click: () => resize(s) })) },
+  { label: 'Iniciar con Windows', type: 'checkbox', checked: startsWithWindows(),
+    click: i => app.setLoginItemSettings({ openAtLogin: i.checked, path: process.execPath, args: loginArgs() }) },
   { type: 'separator' },
   { label: 'Salir', click: () => { app.isQuitting = true; app.quit(); } },
 ]).popup({ window: pet }));

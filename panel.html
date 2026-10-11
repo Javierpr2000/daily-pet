@@ -27,10 +27,9 @@
 <h3>Solo hoy</h3><ul id="today"></ul>
 <script>
   let data;
-  const today = () => new Date().toLocaleDateString('en-CA');
 
   async function refresh() { data = await api.getTasks(); render(); }
-  async function persist() { await api.saveTasks(data); render(); }
+  async function run(op, arg) { data = await api.op(op, arg); render(); }
 
   function render() {
     for (const kind of ['daily', 'today']) {
@@ -41,10 +40,10 @@
         name.textContent = t.title;
         const tick = document.createElement('button');
         tick.textContent = `${t.done}/${t.required}`;
-        tick.onclick = () => { t.done = t.done >= t.required ? 0 : t.done + 1; persist(); };
+        tick.onclick = () => run('tick', t.id);
         const del = document.createElement('button');
         del.textContent = '🗑';
-        del.onclick = () => { data.tasks = data.tasks.filter(x => x !== t); persist(); };
+        del.onclick = () => run('remove', t.id);
         li.append(name, tick, del);
         return li;
       }));
@@ -54,10 +53,8 @@
   document.getElementById('add').onsubmit = e => {
     e.preventDefault();
     const f = new FormData(e.target);
-    data.tasks.push({ id: crypto.randomUUID(), title: f.get('title').trim(), kind: f.get('kind'),
-      required: Math.max(1, +f.get('required') || 1), done: 0, date: today() });
+    run('add', { title: f.get('title'), kind: f.get('kind'), required: f.get('required') });
     e.target.reset();
-    persist();
   };
 
   api.onChanged(refresh);

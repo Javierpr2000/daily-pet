@@ -2,7 +2,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('api', {
   getTasks: () => ipcRenderer.invoke('tasks:get'),
-  saveTasks: data => ipcRenderer.invoke('tasks:save', data),
+  op: (name, arg) => ipcRenderer.invoke('tasks:op', name, arg),
   togglePanel: () => ipcRenderer.send('panel:toggle'),
   hover: h => ipcRenderer.send('pet:hover', h),
   moveBy: (dx, dy) => ipcRenderer.send('pet:moveBy', dx, dy),
