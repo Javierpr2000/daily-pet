@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, screen, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, Menu, Notification } = require('electron');
 const fs = require('fs');
 const path = require('path');
 
@@ -57,16 +57,16 @@ function save(data) {
   writeJson(file(), data);
 }
 
-let pet, panel, dir = 1, paused = false, walking = true, scale = 1, pos;
+let pet, panel, dir = 1, paused = false, walking = true, scale = 1, pos, reminder = null, firedOn;
 const size = () => Math.round(PET * scale);
 const settingsFile = () => path.join(app.getPath('userData'), 'settings.json');
 
 function loadSettings() {
-  ({ walking = true, scale = 1, pos } = readJson(settingsFile(), {}));
+  ({ walking = true, scale = 1, pos, reminder = null } = readJson(settingsFile(), {}));
 }
 
 function saveSettings() {
-  writeJson(settingsFile(), { walking, scale, pos: pet && !pet.isDestroyed() ? pet.getPosition() : pos });
+  writeJson(settingsFile(), { walking, scale, reminder, pos: pet && !pet.isDestroyed() ? pet.getPosition() : pos });
 }
 
 // Dev runs (npm start) must pass the app folder to electron.exe, or Windows launches an empty Electron.
@@ -117,6 +117,20 @@ function togglePanel() {
   panel.webContents.send('tasks:changed');
 }
 
+const hhmm = () => new Date().toTimeString().slice(0, 5);
+// Times already past when the app starts or the reminder is set count as fired today.
+const armReminder = () => { firedOn = reminder && hhmm() >= reminder ? today() : null; };
+
+function checkReminder(data) {
+  if (!reminder || firedOn === today() || hhmm() < reminder) return;
+  firedOn = today();
+  const n = data.tasks.filter(t => t.done < t.required).length;
+  if (!n) return;
+  const note = new Notification({ title: 'Daily Pet', body: `Tienes ${n} tareas pendientes` });
+  note.on('click', () => { if (panel.isDestroyed() || !panel.isVisible()) togglePanel(); });
+  note.show();
+}
+
 function resize(s) {
   scale = s;
   const area = screen.getPrimaryDisplay().workArea;
@@ -130,6 +144,13 @@ ipcMain.handle('tasks:get', () => load());
 ipcMain.handle('tasks:op', (_, op, arg) => {
   if (!Object.hasOwn(ops, op)) throw new Error(`Unknown op ${op}`);
   return apply(op, arg);
+});
+ipcMain.handle('reminder:get', () => reminder);
+ipcMain.handle('reminder:set', (_, t) => {
+  if (t !== null && !/^\d{2}:\d{2}$/.test(t)) throw new Error(`Invalid reminder ${t}`);
+  reminder = t;
+  armReminder();
+  saveSettings();
 });
 ipcMain.on('panel:toggle', togglePanel);
 ipcMain.on('pet:hover', (_, h) => { paused = h; });
@@ -153,6 +174,7 @@ app.on('before-quit', saveSettings);
 
 app.whenReady().then(() => {
   loadSettings();
+  armReminder();
   createWindows();
-  setInterval(() => { load(); if (!panel.isDestroyed() && panel.isVisible()) panel.webContents.send('tasks:changed'); }, 60_000);
+  setInterval(() => { checkReminder(load()); if (!panel.isDestroyed() && panel.isVisible()) panel.webContents.send('tasks:changed'); }, 60_000);
 });
