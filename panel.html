@@ -23,6 +23,7 @@
   <input name="required" type="number" min="1" value="1" title="Repeticiones">
   <button>+</button>
 </form>
+<label style="padding: 0 12px">Recordatorio <input id="reminder" type="time"></label>
 <h3>Diarias</h3><ul id="daily"></ul>
 <h3>Solo hoy</h3><ul id="today"></ul>
 <script>
@@ -56,6 +57,10 @@
     run('add', { title: f.get('title'), kind: f.get('kind'), required: f.get('required') });
     e.target.reset();
   };
+
+  const reminder = document.getElementById('reminder');
+  api.getReminder().then(t => { reminder.value = t ?? ''; });
+  reminder.onchange = () => api.setReminder(reminder.value || null);
 
   api.onChanged(refresh);
   refresh();
