@@ -29,7 +29,7 @@ function load() {
 }
 
 const ops = {
-  add: (data, t) => data.tasks.push({ id: crypto.randomUUID(), title: String(t.title).trim(), kind: t.kind === 'today' ? 'today' : 'daily',
+  add: (data, t) => String(t.title).trim() && data.tasks.push({ id: crypto.randomUUID(), title: String(t.title).trim(), kind: t.kind === 'today' ? 'today' : 'daily',
     required: Math.max(1, Math.floor(+t.required) || 1), done: 0, date: today() }),
   tick: (data, id) => { const t = data.tasks.find(x => x.id === id); if (t) t.done = t.done >= t.required ? 0 : t.done + 1; },
   remove: (data, id) => { data.tasks = data.tasks.filter(x => x.id !== id); },
