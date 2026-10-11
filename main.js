@@ -28,10 +28,14 @@ function load() {
   return resetIfNewDay(readJson(file(), { lastReset: today(), tasks: [] }));
 }
 
+const timeOrNull = v => /^\d{2}:\d{2}$/.test(v) ? v : null;
+const minutesOrNull = v => { const n = Math.floor(+v); return n >= 1 ? Math.min(n, 1440) : null; };
+
 const ops = {
   add: (data, t) => String(t.title).trim() && data.tasks.push({ id: crypto.randomUUID(), title: String(t.title).trim(), kind: t.kind === 'today' ? 'today' : 'daily',
-    required: Math.max(1, Math.floor(+t.required) || 1), done: 0, date: today() }),
-  tick: (data, id) => { const t = data.tasks.find(x => x.id === id); if (t) t.done = t.done >= t.required ? 0 : t.done + 1; },
+    required: Math.max(1, Math.floor(+t.required) || 1), done: 0, date: today(), at: timeOrNull(t.at), every: minutesOrNull(t.every) }),
+  tick: (data, id) => { const t = data.tasks.find(x => x.id === id); if (t) t.done = Math.min(t.required, t.done + 1); },
+  untick: (data, id) => { const t = data.tasks.find(x => x.id === id); if (t) t.done = Math.max(0, t.done - 1); },
   remove: (data, id) => { data.tasks = data.tasks.filter(x => x.id !== id); },
   edit: (data, a) => {
     const t = data.tasks.find(x => x.id === a.id), title = String(a.title).trim();
@@ -39,6 +43,8 @@ const ops = {
     t.title = title;
     t.required = Math.max(1, Math.floor(+a.required) || 1);
     t.done = Math.min(t.done, t.required);
+    t.at = timeOrNull(a.at);
+    t.every = minutesOrNull(a.every);
   },
   move: (data, a) => {
     const i = data.tasks.findIndex(x => x.id === a.id);
@@ -54,7 +60,42 @@ function apply(op, arg) {
   ops[op](data, arg);
   save(data);
   sendProgress(data);
+  notifyTasks();
   return data;
+}
+
+const started = Date.now(), notified = {};
+let taskTimer;
+
+function todayAt(hhmm) {
+  const [h, m] = hhmm.split(':').map(Number);
+  return new Date().setHours(h, m, 0, 0);
+}
+
+function dueAt(t) {
+  if (t.done >= t.required || (!t.at && !t.every)) return null;
+  const base = t.at ? todayAt(t.at) : null, last = notified[t.id];
+  if (base && Date.now() < base) return base;
+  if (!t.every) return last >= base ? null : base;
+  return last ? last + t.every * 60_000 : base ?? started + t.every * 60_000;
+}
+
+function notifyTasks() {
+  clearTimeout(taskTimer);
+  const { tasks } = load(), now = Date.now();
+  const due = tasks.filter(t => { const d = dueAt(t); return d !== null && d <= now + 250; });
+  if (due.length) {
+    due.forEach(t => { notified[t.id] = now; });
+    notify(`Pendiente: ${due.map(t => t.title).join(', ')}`);
+  }
+  const next = Math.min(...tasks.map(dueAt).filter(d => d !== null));
+  if (next < Infinity) taskTimer = setTimeout(notifyTasks, Math.max(0, next - Date.now()) + 200);
+}
+
+function notify(body) {
+  const note = new Notification({ title: 'Daily Pet', body });
+  note.on('click', () => { if (panel.isDestroyed() || !panel.isVisible()) togglePanel(); });
+  note.show();
 }
 
 function sendProgress({ tasks }) {
@@ -143,16 +184,25 @@ function togglePanel() {
 
 const hhmm = () => new Date().toTimeString().slice(0, 5);
 // Times already past when the app starts or the reminder is set count as fired today.
-const armReminder = () => { firedOn = reminder && hhmm() >= reminder ? today() : null; };
+let reminderTimer;
+function armReminder() {
+  firedOn = reminder && hhmm() >= reminder ? today() : null;
+  clearTimeout(reminderTimer);
+  if (!reminder) return;
+  const [h, m] = reminder.split(':').map(Number);
+  const at = new Date();
+  at.setHours(h, m, 0, 0);
+  if (at <= Date.now()) at.setDate(at.getDate() + 1);
+  // The 60s interval stays as a fallback for timers delayed by sleep.
+  reminderTimer = setTimeout(() => { checkReminder(load()); armReminder(); }, at - Date.now() + 200);
+}
 
 function checkReminder(data) {
   if (!reminder || firedOn === today() || hhmm() < reminder) return;
   firedOn = today();
   const n = data.tasks.filter(t => t.done < t.required).length;
   if (!n) return;
-  const note = new Notification({ title: 'Daily Pet', body: `Tienes ${n} tareas pendientes` });
-  note.on('click', () => { if (panel.isDestroyed() || !panel.isVisible()) togglePanel(); });
-  note.show();
+  notify(`Tienes ${n} tareas pendientes`);
 }
 
 function resize(s) {
@@ -203,5 +253,6 @@ app.whenReady().then(() => {
   loadSettings();
   armReminder();
   createWindows();
-  setInterval(() => { checkReminder(load()); if (!panel.isDestroyed() && panel.isVisible()) panel.webContents.send('tasks:changed'); }, 60_000);
+  notifyTasks();
+  setInterval(() => { checkReminder(load()); notifyTasks(); if (!panel.isDestroyed() && panel.isVisible()) panel.webContents.send('tasks:changed'); }, 60_000);
 });
