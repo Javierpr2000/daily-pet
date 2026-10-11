@@ -38,13 +38,33 @@
         li.className = t.done >= t.required ? 'done' : '';
         const name = document.createElement('span');
         name.textContent = t.title;
+        name.title = 'Doble clic para editar';
+        name.ondblclick = () => {
+          const title = Object.assign(document.createElement('input'), { value: t.title });
+          const req = Object.assign(document.createElement('input'), { type: 'number', min: 1, value: t.required });
+          const key = e => {
+            if (e.key === 'Enter') run('edit', { id: t.id, title: title.value, required: req.value });
+            if (e.key === 'Escape') render();
+          };
+          title.onkeydown = req.onkeydown = key;
+          li.replaceChildren(title, req);
+          title.focus();
+        };
+        const up = document.createElement('button');
+        up.textContent = '▲';
+        up.title = 'Subir';
+        up.onclick = () => run('move', { id: t.id, delta: -1 });
+        const down = document.createElement('button');
+        down.textContent = '▼';
+        down.title = 'Bajar';
+        down.onclick = () => run('move', { id: t.id, delta: 1 });
         const tick = document.createElement('button');
         tick.textContent = `${t.done}/${t.required}`;
         tick.onclick = () => run('tick', t.id);
         const del = document.createElement('button');
         del.textContent = '🗑';
         del.onclick = () => run('remove', t.id);
-        li.append(name, tick, del);
+        li.append(name, tick, up, down, del);
         return li;
       }));
     }

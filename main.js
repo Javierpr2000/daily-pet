@@ -33,6 +33,20 @@ const ops = {
     required: Math.max(1, Math.floor(+t.required) || 1), done: 0, date: today() }),
   tick: (data, id) => { const t = data.tasks.find(x => x.id === id); if (t) t.done = t.done >= t.required ? 0 : t.done + 1; },
   remove: (data, id) => { data.tasks = data.tasks.filter(x => x.id !== id); },
+  edit: (data, a) => {
+    const t = data.tasks.find(x => x.id === a.id), title = String(a.title).trim();
+    if (!t || !title) return;
+    t.title = title;
+    t.required = Math.max(1, Math.floor(+a.required) || 1);
+    t.done = Math.min(t.done, t.required);
+  },
+  move: (data, a) => {
+    const i = data.tasks.findIndex(x => x.id === a.id);
+    if (i < 0) return;
+    const same = data.tasks.map((x, j) => j).filter(j => data.tasks[j].kind === data.tasks[i].kind);
+    const j = same[same.indexOf(i) + (a.delta < 0 ? -1 : 1)];
+    if (j !== undefined) [data.tasks[i], data.tasks[j]] = [data.tasks[j], data.tasks[i]];
+  },
 };
 
 function apply(op, arg) {
