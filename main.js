@@ -57,37 +57,44 @@ function save(data) {
   writeJson(file(), data);
 }
 
-let pet, panel, dir = 1, paused = false, walking = true, scale = 1;
+let pet, panel, dir = 1, paused = false, walking = true, scale = 1, pos;
 const size = () => Math.round(PET * scale);
 const settingsFile = () => path.join(app.getPath('userData'), 'settings.json');
 
 function loadSettings() {
-  ({ walking = true, scale = 1 } = readJson(settingsFile(), {}));
+  ({ walking = true, scale = 1, pos } = readJson(settingsFile(), {}));
 }
 
 function saveSettings() {
-  writeJson(settingsFile(), { walking, scale });
+  writeJson(settingsFile(), { walking, scale, pos: pet && !pet.isDestroyed() ? pet.getPosition() : pos });
 }
 
 // Dev runs (npm start) must pass the app folder to electron.exe, or Windows launches an empty Electron.
 const loginArgs = () => app.isPackaged ? [] : [app.getAppPath()];
 const startsWithWindows = () => app.getLoginItemSettings({ args: loginArgs() }).openAtLogin;
 
-function createWindows() {
-  const area = screen.getPrimaryDisplay().workArea;
-  const common = { frame: false, alwaysOnTop: true, resizable: false,
-    webPreferences: { preload: path.join(__dirname, 'preload.js') } };
+const common = { frame: false, alwaysOnTop: true, resizable: false,
+  webPreferences: { preload: path.join(__dirname, 'preload.js') } };
 
-  pet = new BrowserWindow({ ...common, transparent: true, skipTaskbar: true,
-    width: size(), height: size(), x: area.x + 100, y: area.y + area.height - size() });
-  pet.loadFile('pet.html');
-  pet.webContents.on('did-finish-load', () => pet.webContents.setZoomFactor(scale));
-
+function createPanel() {
   panel = new BrowserWindow({ ...common, width: 360, height: 500, show: false });
   panel.loadFile('panel.html');
   panel.on('close', e => { if (!app.isQuitting) { e.preventDefault(); panel.hide(); } });
+}
 
-  setInterval(() => {
+function createWindows() {
+  const area = screen.getPrimaryDisplay().workArea;
+
+  const fits = pos && pos[0] >= area.x && pos[0] <= area.x + area.width - size()
+    && pos[1] >= area.y && pos[1] <= area.y + area.height - size();
+  const [x, y] = fits ? pos : [area.x + 100, area.y + area.height - size()];
+  pet = new BrowserWindow({ ...common, transparent: true, skipTaskbar: true, width: size(), height: size(), x, y });
+  pet.loadFile('pet.html');
+  pet.webContents.on('did-finish-load', () => pet.webContents.setZoomFactor(scale));
+
+  createPanel();
+
+  const walker = setInterval(() => {
     if (paused) return;
     if (!walking) return pet.webContents.send('pet:dir', 0);
     const [x, y] = pet.getPosition();
@@ -97,9 +104,11 @@ function createWindows() {
     pet.setPosition(Math.max(min, Math.min(max, x + dir * 2)), y);
     pet.webContents.send('pet:dir', dir);
   }, 50);
+  pet.on('closed', () => clearInterval(walker));
 }
 
 function togglePanel() {
+  if (panel.isDestroyed()) createPanel();
   if (panel.isVisible()) return panel.hide();
   const area = screen.getPrimaryDisplay().workArea;
   const [x] = pet.getPosition();
@@ -128,6 +137,7 @@ ipcMain.on('pet:moveBy', (_, dx, dy) => {
   const [x, y] = pet.getPosition();
   pet.setPosition(x + dx, y + dy);
 });
+ipcMain.on('pet:dragEnd', saveSettings);
 ipcMain.on('pet:menu', () => Menu.buildFromTemplate([
   { label: 'Mostrar panel', click: togglePanel },
   { label: 'Caminar', type: 'checkbox', checked: walking, click: () => { walking = !walking; saveSettings(); } },
@@ -139,8 +149,10 @@ ipcMain.on('pet:menu', () => Menu.buildFromTemplate([
   { label: 'Salir', click: () => { app.isQuitting = true; app.quit(); } },
 ]).popup({ window: pet }));
 
+app.on('before-quit', saveSettings);
+
 app.whenReady().then(() => {
   loadSettings();
   createWindows();
-  setInterval(() => { load(); if (panel.isVisible()) panel.webContents.send('tasks:changed'); }, 60_000);
+  setInterval(() => { load(); if (!panel.isDestroyed() && panel.isVisible()) panel.webContents.send('tasks:changed'); }, 60_000);
 });

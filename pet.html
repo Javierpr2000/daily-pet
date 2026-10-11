@@ -25,7 +25,7 @@
     last = [last[0] + dx, last[1] + dy];
     api.moveBy(dx, dy);
   };
-  pet.onpointerup = () => { last = null; };
+  pet.onpointerup = () => { last = null; if (dragged) api.dragEnd(); };
   pet.onclick = () => { if (!dragged) api.togglePanel(); };
   pet.oncontextmenu = e => { e.preventDefault(); api.menu(); };
   pet.onmouseenter = () => { api.hover(true); pet.classList.add('idle'); };

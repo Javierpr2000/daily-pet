@@ -16,7 +16,7 @@
   input[name=required] { width: 48px; }
 </style></head>
 <body>
-<header><b>Hoy</b><button onclick="window.close()">✕</button></header>
+<header><b>Hoy</b><button onclick="api.togglePanel()">✕</button></header>
 <form id="add">
   <input name="title" placeholder="Nueva tarea" required>
   <select name="kind"><option value="daily">Diaria</option><option value="today">Solo hoy</option></select>
