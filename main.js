@@ -82,11 +82,14 @@ function createPanel() {
   panel.on('close', e => { if (!app.isQuitting) { e.preventDefault(); panel.hide(); } });
 }
 
-function createWindows() {
-  const area = screen.getPrimaryDisplay().workArea;
+const areaOf = bounds => screen.getDisplayMatching(bounds).workArea;
+const petArea = () => areaOf(pet.getBounds());
 
-  const fits = pos && pos[0] >= area.x && pos[0] <= area.x + area.width - size()
-    && pos[1] >= area.y && pos[1] <= area.y + area.height - size();
+function createWindows() {
+  const saved = pos && areaOf({ x: pos[0], y: pos[1], width: size(), height: size() });
+  const fits = saved && pos[0] >= saved.x && pos[0] <= saved.x + saved.width - size()
+    && pos[1] >= saved.y && pos[1] <= saved.y + saved.height - size();
+  const area = screen.getPrimaryDisplay().workArea;
   const [x, y] = fits ? pos : [area.x + 100, area.y + area.height - size()];
   pet = new BrowserWindow({ ...common, transparent: true, skipTaskbar: true, width: size(), height: size(), x, y });
   pet.loadFile('pet.html');
@@ -98,6 +101,7 @@ function createWindows() {
     if (paused) return;
     if (!walking) return pet.webContents.send('pet:dir', 0);
     const [x, y] = pet.getPosition();
+    const area = petArea();
     const min = area.x, max = area.x + area.width - size();
     // ponytail: random turn 0.5%/tick; add idle/sit states if it looks too robotic
     if (x <= min || x >= max || Math.random() < 0.005) dir = -dir;
@@ -110,7 +114,7 @@ function createWindows() {
 function togglePanel() {
   if (panel.isDestroyed()) createPanel();
   if (panel.isVisible()) return panel.hide();
-  const area = screen.getPrimaryDisplay().workArea;
+  const area = petArea();
   const [x] = pet.getPosition();
   panel.setPosition(Math.max(area.x, Math.min(area.x + area.width - 360, x - 132)), area.y + area.height - size() - 500);
   panel.show();
@@ -119,7 +123,7 @@ function togglePanel() {
 
 function resize(s) {
   scale = s;
-  const area = screen.getPrimaryDisplay().workArea;
+  const area = petArea();
   const [x] = pet.getPosition();
   pet.setBounds({ x: Math.min(x, area.x + area.width - size()), y: area.y + area.height - size(), width: size(), height: size() });
   pet.webContents.setZoomFactor(s);
